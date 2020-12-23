@@ -19,5 +19,16 @@ const puppeteer = require("puppeteer");
     console.log(department);
   });
 
+  // Fill form
+  await page.select("[id='formTurma:inputNivel']", "G");
+  await page.select("[id='formTurma:inputDepto']", "673");
+  await page.type("[id='formTurma:inputAno']", "2020");
+  await page.select("[id='formTurma:inputPeriodo']", "2");
+
+  // Click on search button
+  await page.click("[value='Buscar']");
+
+  // Get courses data
+
   await browser.close();
 })();
