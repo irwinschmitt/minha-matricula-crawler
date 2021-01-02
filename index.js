@@ -1,20 +1,20 @@
 const puppeteer = require("puppeteer");
 var fs = require("fs");
 
-function formatHour(textContent) {}
-
 async function goToDepartment(page, department) {
-  console.log(department.id);
-  console.log(department.title);
+  console.log(`(${department.id}) ${department.title}`);
 
-  await page.select("[id='formTurma:inputNivel']", "G");
-  await page.select("[id='formTurma:inputDepto']", department.id);
-  await page.type("[id='formTurma:inputAno']", "2020");
-  await page.select("[id='formTurma:inputPeriodo']", "2");
+  await page.evaluate(
+    ({ id }) => {
+      document.getElementById("formTurma:inputNivel").value = "G";
+      document.getElementById("formTurma:inputDepto").value = id;
+      document.getElementById("formTurma:inputAno").value = "2020";
+      document.getElementById("formTurma:inputPeriodo").value = "2";
+    },
+    { id: department.id }
+  );
 
-  await page.click("[value='Buscar']");
-
-  await page.waitForTimeout(3000);
+  await Promise.all([page.click("[value='Buscar']"), page.waitForNavigation()]);
 
   const courses = await page.evaluate(() => {
     const linesArray = Array.from(document.querySelectorAll("tr"));
@@ -67,21 +67,26 @@ async function goToDepartment(page, department) {
     });
   });
 
-  const coursesFormatted = [];
+  const coursesFormatted = {
+    courses: [],
+    classes: [],
+  };
   var index = -1;
   courses.forEach((element) => {
     if (!element) return;
 
     if (element.parent) {
       index++;
-      coursesFormatted.push({
-        id: element.id,
+      coursesFormatted.courses.push({
+        courseId: element.id,
         title: element.title,
-        classes: [],
+        departmentId: department.id,
+        departmentTitle: department.title,
       });
     } else {
-      coursesFormatted[index].classes.push({
-        id: element.id,
+      coursesFormatted.classes.push({
+        classId: element.id,
+        courseId: coursesFormatted.courses[index].courseId,
         period: element.period,
         professor: element.professor,
         timeLoad: element.timeLoad,
@@ -108,29 +113,28 @@ async function goToDepartment(page, department) {
     }))
   );
 
-  const departmentsFormatted = [];
-
+  var allCourses = [];
+  var allClasses = [];
   // for (let i = 1; i < departments.length; i++) {
-  for (let i = 4; i < 5; i++) {
-    // const departmentInfo = await goToDepartment(page, departments[i]);
-
-    departmentsFormatted.push({
-      id: departments[i].id,
-      title: departments[i].title,
-      courses: await goToDepartment(page, departments[i]),
-    });
+  for (let i = 4; i < 7; i++) {
+    var { courses, classes } = await goToDepartment(page, departments[i]);
+    allCourses = allCourses.concat(courses);
+    allClasses = allClasses.concat(classes);
   }
 
-  // courses.forEach((element) => {
-  //   console.log(element);
-  // });
+  const jsonCourses = JSON.stringify(allCourses);
+  fs.writeFile(
+    "courses.json",
+    jsonCourses,
+    (error) => !error ?? console.log(error)
+  );
 
-  const jsonCourses = JSON.stringify(departmentsFormatted);
-  fs.writeFile("data.json", jsonCourses, (error) => {
-    if (error) {
-      console.log(error);
-    }
-  });
+  const jsonClasses = JSON.stringify(allClasses);
+  fs.writeFile(
+    "classes.json",
+    jsonClasses,
+    (error) => !error ?? console.log(error)
+  );
 
   await browser.close();
 })();
